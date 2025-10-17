@@ -13,8 +13,9 @@ const REVIEW_CHANNEL_ID = 'C09MVJXTMMW'; // Replace with your channel ID
 
 // Function to parse a review from message text
 function parseReview(text) {
-  const dateMatch = text.match(/Date:\s*(\S+)/);
-  const pnMatch = text.match(/PN:\s*([^\n]+)/);
+  const dateMatch = text.match(/Date:\s*(\d+\/\d+)/i);
+  // Match both "PN:" and "Name:" formats
+  const pnMatch = text.match(/(?:PN|Name):\s*([^\n\r]+)/i);
   
   if (!dateMatch || !pnMatch) return null;
   
