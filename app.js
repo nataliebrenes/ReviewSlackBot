@@ -69,7 +69,21 @@ app.command('/review', async ({ command, ack, respond, client }) => {
       const review = parseReview(message.text || '');
       
       if (review && review.pledgeName.toLowerCase().includes(searchName.toLowerCase())) {
-        matchingReviews.push(review);
+        // Get the author's info
+        let authorName = 'Unknown';
+        if (message.user) {
+          try {
+            const userInfo = await client.users.info({ user: message.user });
+            authorName = userInfo.user.real_name || userInfo.user.name;
+          } catch (e) {
+            console.error('Error fetching user info:', e);
+          }
+        }
+        
+        matchingReviews.push({
+          ...review,
+          author: authorName
+        });
       }
     }
     
@@ -109,19 +123,35 @@ app.command('/review', async ({ command, ack, respond, client }) => {
       }
     ];
     
-    // Add each review
+    // Add each review with author info
     matchingReviews.forEach((review, index) => {
       blocks.push({
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: review.fullText
+          text: `*Reviewed by: ${review.author}*\n\n${review.fullText}`
         }
       });
       
       if (index < matchingReviews.length - 1) {
         blocks.push({ type: 'divider' });
       }
+    });
+    
+    // Add dismiss button at the end
+    blocks.push({
+      type: 'actions',
+      elements: [
+        {
+          type: 'button',
+          text: {
+            type: 'plain_text',
+            text: 'Dismiss'
+          },
+          action_id: 'dismiss_reviews',
+          style: 'danger'
+        }
+      ]
     });
     
     await respond({
@@ -136,6 +166,16 @@ app.command('/review', async ({ command, ack, respond, client }) => {
       response_type: 'ephemeral'
     });
   }
+});
+
+// Handle dismiss button click
+app.action('dismiss_reviews', async ({ ack, respond }) => {
+  await ack();
+  
+  // Delete the message by responding with empty content
+  await respond({
+    delete_original: true
+  });
 });
 
 // Start the app
