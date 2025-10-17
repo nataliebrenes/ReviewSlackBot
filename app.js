@@ -9,7 +9,7 @@ const app = new App({
 });
 
 // The channel ID where reviews are posted
-const REVIEW_CHANNEL_ID = 'YOUR_CHANNEL_ID'; // Replace with your channel ID
+const REVIEW_CHANNEL_ID = 'C09K90ZEWV7'; // Replace with your channel ID
 
 // Function to parse a review from message text
 function parseReview(text) {
