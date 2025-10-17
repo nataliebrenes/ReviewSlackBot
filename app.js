@@ -14,14 +14,23 @@ const REVIEW_CHANNEL_ID = 'C09MVJXTMMW'; // Replace with your channel ID
 // Function to parse a review from message text
 function parseReview(text) {
   const dateMatch = text.match(/Date:\s*(\d+\/\d+)/i);
-  // Match both "PN:" and "Name:" formats
-  const pnMatch = text.match(/(?:PN|Name):\s*([^\n\r]+)/i);
   
-  if (!dateMatch || !pnMatch) return null;
+  if (!dateMatch) return null;
+  
+  // Find everything between Date and FB/Feedback
+  // This captures the name line regardless of prefix
+  const nameSection = text.match(/Date:\s*\d+\/\d+[^\n]*\n([^\n]+?)(?=\n(?:FB|Feedback):)/is);
+  
+  if (!nameSection) return null;
+  
+  let nameLine = nameSection[1].trim();
+  
+  // Remove common prefixes if they exist
+  nameLine = nameLine.replace(/^(?:PN|Name|Pledge Name|Pledge):\s*/i, '');
   
   return {
     date: dateMatch[1].trim(),
-    pledgeName: pnMatch[1].trim(),
+    pledgeName: nameLine.trim(),
     fullText: text
   };
 }
