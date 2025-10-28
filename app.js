@@ -10,6 +10,7 @@ const app = new App({
 
 // The channel ID where reviews are posted
 const REVIEW_CHANNEL_ID = 'C09K90ZEWV7';
+const { App } = require('@slack/bolt');
 
 
 // List of all pledges
@@ -81,17 +82,23 @@ function findPledgeReview(pledgeName, messageText) {
   const lastName = lastNameParts.join(' ');
   const lastInitial = lastName.charAt(0);
   
+  // Check if this first name is shared by multiple pledges
+  const duplicateFirstNames = PLEDGES.filter(p => 
+    p.split(' ')[0].toLowerCase() === firstName.toLowerCase()
+  );
+  const hasDuplicateFirstName = duplicateFirstNames.length > 1;
+  
   // Find where this pledge's name appears in the message
   let startIndex = -1;
   
   // Try different name formats to find the start position
-  // 1. Full name (e.g., "Kosei van Doorn")
+  // 1. Full name (e.g., "Jack Martin")
   const fullNameIndex = textLower.indexOf(pledgeName.toLowerCase());
   if (fullNameIndex !== -1) {
     startIndex = fullNameIndex;
   }
   
-  // 2. First + last initial (e.g., "Kosei v")
+  // 2. First + last initial (e.g., "Jack M")
   if (startIndex === -1) {
     const firstLastInitialIndex = textLower.indexOf(`${firstName.toLowerCase()} ${lastInitial.toLowerCase()}`);
     if (firstLastInitialIndex !== -1) {
@@ -99,8 +106,8 @@ function findPledgeReview(pledgeName, messageText) {
     }
   }
   
-  // 3. Just first name with word boundary (e.g., just "Kosei")
-  if (startIndex === -1) {
+  // 3. Just first name - but ONLY if there are no duplicate first names
+  if (startIndex === -1 && !hasDuplicateFirstName) {
     const firstNameRegex = new RegExp(`\\b${firstName.toLowerCase()}\\b`, 'i');
     const match = firstNameRegex.exec(textLower);
     if (match) {
@@ -138,6 +145,12 @@ function findPledgeReview(pledgeName, messageText) {
     const otherLastName = otherLastParts.join(' ');
     const otherLastInitial = otherLastName.charAt(0);
     
+    // Check if other pledge has duplicate first name
+    const otherDuplicates = PLEDGES.filter(p => 
+      p.split(' ')[0].toLowerCase() === otherFirstName.toLowerCase()
+    );
+    const otherHasDuplicate = otherDuplicates.length > 1;
+    
     // Look for other pledge names after our start position
     const textAfterStart = messageText.substring(startIndex + 1).toLowerCase();
     
@@ -159,13 +172,15 @@ function findPledgeReview(pledgeName, messageText) {
       }
     }
     
-    // Check for just first name with word boundary
-    const otherFirstRegex = new RegExp(`\\b${otherFirstName.toLowerCase()}\\b`, 'i');
-    const otherMatch = otherFirstRegex.exec(textAfterStart);
-    if (otherMatch) {
-      otherIndex = otherMatch.index + startIndex + 1;
-      if (otherIndex < nearestNextPledge) {
-        nearestNextPledge = otherIndex;
+    // Check for just first name - but ONLY if no duplicates
+    if (!otherHasDuplicate) {
+      const otherFirstRegex = new RegExp(`\\b${otherFirstName.toLowerCase()}\\b`, 'i');
+      const otherMatch = otherFirstRegex.exec(textAfterStart);
+      if (otherMatch) {
+        otherIndex = otherMatch.index + startIndex + 1;
+        if (otherIndex < nearestNextPledge) {
+          nearestNextPledge = otherIndex;
+        }
       }
     }
   }
