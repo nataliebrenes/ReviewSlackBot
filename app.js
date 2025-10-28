@@ -10,8 +10,6 @@ const app = new App({
 
 // The channel ID where reviews are posted
 const REVIEW_CHANNEL_ID = 'C09K90ZEWV7';
-const { App } = require('@slack/bolt');
-
 
 // List of all pledges
 const PLEDGES = [
