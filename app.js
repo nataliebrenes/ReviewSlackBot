@@ -11,6 +11,7 @@ const app = new App({
 // The channel ID where reviews are posted
 const REVIEW_CHANNEL_ID = 'C09K90ZEWV7';
 
+
 // List of all pledges
 const PLEDGES = [
   "Adrina Khatchikyan", "Aidan Sogorka", "Alexia Barron", "Allyson Bender", 
@@ -80,33 +81,78 @@ function findPledgeReview(pledgeName, messageText) {
   const lastName = lastNameParts.join(' ');
   const lastInitial = lastName.charAt(0);
   
-  // Check if pledge appears anywhere in the message
-  const hasFullName = textLower.includes(pledgeName.toLowerCase());
-  const hasFirstAndLastInitial = textLower.includes(`${firstName.toLowerCase()} ${lastInitial.toLowerCase()}`);
-  const hasFirstAndLastName = textLower.includes(firstName.toLowerCase()) && textLower.includes(lastName.toLowerCase());
+  // Find where this pledge's name appears in the message
+  let startIndex = -1;
   
-  if (!hasFullName && !hasFirstAndLastInitial && !hasFirstAndLastName) {
-    return null; // Pledge not in this message
-  }
+  // Try different name formats to find the start position
+  const fullNameIndex = textLower.indexOf(pledgeName.toLowerCase());
+  const firstLastInitialIndex = textLower.indexOf(`${firstName.toLowerCase()} ${lastInitial.toLowerCase()}`);
   
-  // Split message into individual reviews (by looking for "Date" patterns)
-  const reviewSections = messageText.split(/(?=Date[\s:]*\d{1,2}\/\d{1,2})/i);
-  
-  // Find the section that contains this pledge
-  for (const section of reviewSections) {
-    const sectionLower = section.toLowerCase();
-    const firstLines = section.split('\n').slice(0, 10).join('\n').toLowerCase();
-    
-    // Check if this section is about our pledge
-    if (firstLines.includes(pledgeName.toLowerCase()) ||
-        firstLines.includes(`${firstName.toLowerCase()} ${lastInitial.toLowerCase()}`) ||
-        (firstLines.includes(firstName.toLowerCase()) && firstLines.includes(lastName.toLowerCase()))) {
-      return section.trim();
+  if (fullNameIndex !== -1) {
+    startIndex = fullNameIndex;
+  } else if (firstLastInitialIndex !== -1) {
+    startIndex = firstLastInitialIndex;
+  } else {
+    // Look for first name with last name somewhere nearby
+    const firstNameIndex = textLower.indexOf(firstName.toLowerCase());
+    if (firstNameIndex !== -1 && textLower.indexOf(lastName.toLowerCase()) !== -1) {
+      startIndex = firstNameIndex;
     }
   }
   
-  // Fallback: if no "Date" splits worked, return full message if pledge is mentioned
-  return messageText;
+  if (startIndex === -1) {
+    return null; // Pledge not found in message
+  }
+  
+  // Find the start of the line containing the name (go back to beginning of line)
+  let lineStart = startIndex;
+  while (lineStart > 0 && messageText[lineStart - 1] !== '\n') {
+    lineStart--;
+  }
+  
+  // Now find where the next different pledge name appears
+  let endIndex = messageText.length;
+  let nearestNextPledge = messageText.length;
+  
+  for (const otherPledge of PLEDGES) {
+    if (otherPledge === pledgeName) continue; // Skip the same pledge
+    
+    const [otherFirstName, ...otherLastParts] = otherPledge.split(' ');
+    const otherLastName = otherLastParts.join(' ');
+    const otherLastInitial = otherLastName.charAt(0);
+    
+    // Look for other pledge names after our start position
+    const textAfterStart = messageText.substring(startIndex + 1).toLowerCase();
+    
+    // Check for full name
+    let otherIndex = textAfterStart.indexOf(otherPledge.toLowerCase());
+    if (otherIndex !== -1) {
+      otherIndex += startIndex + 1;
+      if (otherIndex < nearestNextPledge) {
+        nearestNextPledge = otherIndex;
+      }
+    }
+    
+    // Check for first + last initial
+    otherIndex = textAfterStart.indexOf(`${otherFirstName.toLowerCase()} ${otherLastInitial.toLowerCase()}`);
+    if (otherIndex !== -1) {
+      otherIndex += startIndex + 1;
+      if (otherIndex < nearestNextPledge) {
+        nearestNextPledge = otherIndex;
+      }
+    }
+  }
+  
+  // Find the start of the line containing the next pledge (go back to beginning of that line)
+  if (nearestNextPledge < messageText.length) {
+    while (nearestNextPledge > lineStart && messageText[nearestNextPledge - 1] !== '\n') {
+      nearestNextPledge--;
+    }
+    endIndex = nearestNextPledge;
+  }
+  
+  // Extract just this pledge's review
+  return messageText.substring(lineStart, endIndex).trim();
 }
 
 // Determine which week a message timestamp falls into
