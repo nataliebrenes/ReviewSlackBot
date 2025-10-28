@@ -85,18 +85,26 @@ function findPledgeReview(pledgeName, messageText) {
   let startIndex = -1;
   
   // Try different name formats to find the start position
+  // 1. Full name (e.g., "Kosei van Doorn")
   const fullNameIndex = textLower.indexOf(pledgeName.toLowerCase());
-  const firstLastInitialIndex = textLower.indexOf(`${firstName.toLowerCase()} ${lastInitial.toLowerCase()}`);
-  
   if (fullNameIndex !== -1) {
     startIndex = fullNameIndex;
-  } else if (firstLastInitialIndex !== -1) {
-    startIndex = firstLastInitialIndex;
-  } else {
-    // Look for first name with last name somewhere nearby
-    const firstNameIndex = textLower.indexOf(firstName.toLowerCase());
-    if (firstNameIndex !== -1 && textLower.indexOf(lastName.toLowerCase()) !== -1) {
-      startIndex = firstNameIndex;
+  }
+  
+  // 2. First + last initial (e.g., "Kosei v")
+  if (startIndex === -1) {
+    const firstLastInitialIndex = textLower.indexOf(`${firstName.toLowerCase()} ${lastInitial.toLowerCase()}`);
+    if (firstLastInitialIndex !== -1) {
+      startIndex = firstLastInitialIndex;
+    }
+  }
+  
+  // 3. Just first name with word boundary (e.g., just "Kosei")
+  if (startIndex === -1) {
+    const firstNameRegex = new RegExp(`\\b${firstName.toLowerCase()}\\b`, 'i');
+    const match = firstNameRegex.exec(textLower);
+    if (match) {
+      startIndex = match.index;
     }
   }
   
@@ -108,6 +116,15 @@ function findPledgeReview(pledgeName, messageText) {
   let lineStart = startIndex;
   while (lineStart > 0 && messageText[lineStart - 1] !== '\n') {
     lineStart--;
+  }
+  
+  // Go back one more line to include the line above the name
+  if (lineStart > 0) {
+    let prevLineStart = lineStart - 1; // Skip the newline
+    while (prevLineStart > 0 && messageText[prevLineStart - 1] !== '\n') {
+      prevLineStart--;
+    }
+    lineStart = prevLineStart;
   }
   
   // Now find where the next different pledge name appears
@@ -137,6 +154,16 @@ function findPledgeReview(pledgeName, messageText) {
     otherIndex = textAfterStart.indexOf(`${otherFirstName.toLowerCase()} ${otherLastInitial.toLowerCase()}`);
     if (otherIndex !== -1) {
       otherIndex += startIndex + 1;
+      if (otherIndex < nearestNextPledge) {
+        nearestNextPledge = otherIndex;
+      }
+    }
+    
+    // Check for just first name with word boundary
+    const otherFirstRegex = new RegExp(`\\b${otherFirstName.toLowerCase()}\\b`, 'i');
+    const otherMatch = otherFirstRegex.exec(textAfterStart);
+    if (otherMatch) {
+      otherIndex = otherMatch.index + startIndex + 1;
       if (otherIndex < nearestNextPledge) {
         nearestNextPledge = otherIndex;
       }
