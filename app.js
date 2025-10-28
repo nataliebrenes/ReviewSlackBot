@@ -73,27 +73,40 @@ function findPledge(searchTerm) {
   return PLEDGES.find(p => p.toLowerCase().includes(search));
 }
 
-// Check if a pledge name appears in the first 5 lines of the message
-function pledgeInMessage(pledgeName, messageText) {
-  const lines = messageText.split('\n').slice(0, 5);
-  const firstFiveLines = lines.join('\n').toLowerCase();
-  
+// Check if a pledge name appears in text and extract just their review
+function findPledgeReview(pledgeName, messageText) {
+  const textLower = messageText.toLowerCase();
   const [firstName, ...lastNameParts] = pledgeName.split(' ');
   const lastName = lastNameParts.join(' ');
   const lastInitial = lastName.charAt(0);
   
-  // Check for full name
-  if (firstFiveLines.includes(pledgeName.toLowerCase())) return true;
+  // Check if pledge appears anywhere in the message
+  const hasFullName = textLower.includes(pledgeName.toLowerCase());
+  const hasFirstAndLastInitial = textLower.includes(`${firstName.toLowerCase()} ${lastInitial.toLowerCase()}`);
+  const hasFirstAndLastName = textLower.includes(firstName.toLowerCase()) && textLower.includes(lastName.toLowerCase());
   
-  // Check for first name + last initial (e.g., "Sophia C")
-  if (firstFiveLines.includes(`${firstName.toLowerCase()} ${lastInitial.toLowerCase()}`)) return true;
+  if (!hasFullName && !hasFirstAndLastInitial && !hasFirstAndLastName) {
+    return null; // Pledge not in this message
+  }
   
-  // Check for first name + full last name
-  if (firstFiveLines.includes(firstName.toLowerCase()) && firstFiveLines.includes(lastName.toLowerCase())) return true;
+  // Split message into individual reviews (by looking for "Date" patterns)
+  const reviewSections = messageText.split(/(?=Date[\s:]*\d{1,2}\/\d{1,2})/i);
   
-  // Check for just first name (if unique enough)
-  const firstNameRegex = new RegExp(`\\b${firstName.toLowerCase()}\\b`, 'i');
-  return firstNameRegex.test(firstFiveLines);
+  // Find the section that contains this pledge
+  for (const section of reviewSections) {
+    const sectionLower = section.toLowerCase();
+    const firstLines = section.split('\n').slice(0, 10).join('\n').toLowerCase();
+    
+    // Check if this section is about our pledge
+    if (firstLines.includes(pledgeName.toLowerCase()) ||
+        firstLines.includes(`${firstName.toLowerCase()} ${lastInitial.toLowerCase()}`) ||
+        (firstLines.includes(firstName.toLowerCase()) && firstLines.includes(lastName.toLowerCase()))) {
+      return section.trim();
+    }
+  }
+  
+  // Fallback: if no "Date" splits worked, return full message if pledge is mentioned
+  return messageText;
 }
 
 // Determine which week a message timestamp falls into
@@ -149,8 +162,10 @@ app.command('/review', async ({ command, ack, respond, client }) => {
     for (const message of messages) {
       const messageText = message.text || '';
       
-      // Check if this pledge's name appears in first 5 lines
-      if (pledgeInMessage(pledgeName, messageText)) {
+      // Check if this pledge appears in the message and extract their specific review
+      const pledgeReview = findPledgeReview(pledgeName, messageText);
+      
+      if (pledgeReview) {
         // Get the author's info
         let authorName = 'Unknown';
         if (message.user) {
@@ -172,7 +187,7 @@ app.command('/review', async ({ command, ack, respond, client }) => {
           
           reviewsByWeek[week].push({
             author: authorName,
-            text: messageText,
+            text: pledgeReview, // Use extracted review, not full message
             timestamp: message.ts
           });
         }
